@@ -33,9 +33,11 @@
 #include <hpx/modules/timing.hpp>
 #include <hpx/modules/type_support.hpp>
 
+#include <chrono>
 #include <exception>
 #include <iterator>
 #include <memory>
+#include <source_location>
 #include <type_traits>
 #include <utility>
 
@@ -882,6 +884,43 @@ namespace hpx {
                     return HPX_INVOKE(conv, f.get());
                 });
         }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Default bound for waiting on a future.
+    HPX_CXX_CORE_EXPORT inline constexpr std::chrono::milliseconds
+        default_future_timeout{1000};
+
+    // Current timeout value for waiting on a future
+    HPX_CXX_CORE_EXPORT HPX_CORE_EXPORT std::chrono::milliseconds
+    get_future_timeout() noexcept;
+
+    HPX_CXX_CORE_EXPORT HPX_CORE_EXPORT void set_future_timeout(
+        hpx::chrono::steady_duration const& timeout) noexcept;
+
+    // Wait on a future and handle timeouts as needed.
+    HPX_CXX_CORE_EXPORT template <typename T>
+    decltype(auto) wait_or_handle_timeout(hpx::future<T>&& f,
+        char const* function_name,
+        hpx::chrono::steady_duration const& timeout = hpx::get_future_timeout(),
+        hpx::error_code& ec = hpx::throws)
+    {
+        if (f.wait_for(timeout, ec) == hpx::future_status::timeout || ec)
+        {
+            HPX_THROWS_IF(ec, hpx::error::future_wait_timed_out, function_name,
+                "future.wait_for timed out");
+        }
+        return f.get(ec);
+    }
+
+    HPX_CXX_CORE_EXPORT template <typename T>
+    decltype(auto) wait_or_handle_timeout(hpx::future<T>&& f,
+        std::source_location const& location = std::source_location::current(),
+        hpx::chrono::steady_duration const& timeout = hpx::get_future_timeout(),
+        hpx::error_code& ec = hpx::throws)
+    {
+        return wait_or_handle_timeout(
+            HPX_MOVE(f), location.function_name(), timeout, ec);
     }
 }    // namespace hpx
 

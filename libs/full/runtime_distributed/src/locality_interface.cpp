@@ -46,6 +46,14 @@ namespace hpx::parcelset {
                 .create_locality(name);
         }
 
+        bool locality_was_disconnected(std::uint32_t const id)
+        {
+            HPX_ASSERT(get_runtime_ptr());
+            return get_runtime_distributed()
+                .get_parcel_handler()
+                .locality_was_disconnected(id);
+        }
+
         parcel_write_handler_type set_parcel_write_handler(
             parcel_write_handler_type const& f)
         {
@@ -141,6 +149,8 @@ namespace hpx::parcelset {
         {
             detail::create_parcel = &detail::impl::create_parcel;
             detail::create_locality = &detail::impl::create_locality;
+            detail::locality_was_disconnected =
+                &detail::impl::locality_was_disconnected;
             detail::set_parcel_write_handler =
                 &detail::impl::set_parcel_write_handler;
 

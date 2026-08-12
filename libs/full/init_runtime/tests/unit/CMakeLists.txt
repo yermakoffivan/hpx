@@ -13,6 +13,18 @@ if(HPX_WITH_DISTRIBUTED_RUNTIME)
   set(tests ${tests} handled_exception unhandled_exception)
 endif()
 
+if(HPX_WITH_SUPERVISION)
+  set(tests ${tests} force_disconnect)
+
+  # cmake-format: off
+  set(force_disconnect_PARAMETERS LOCALITIES 3)
+  set(force_disconnect_FLAGS
+      COMPILE_FLAGS -DHPX_HAVE_RUN_MAIN_EVERYWHERE
+      DEPENDENCIES supervision_dispatch_component
+  )
+  # cmake-format: on
+endif()
+
 set(unhandled_exception_PARAMETERS FAILURE_EXPECTED)
 
 foreach(test ${tests})
@@ -33,4 +45,15 @@ foreach(test ${tests})
   )
 
   add_hpx_unit_test("modules.init_runtime" ${test} ${${test}_PARAMETERS})
+
+  # MSVC V1951 and V1952 expose ICE compiling this in C++20 module mode
+  if(HPX_WITH_CXX_MODULES
+     AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+     AND (MSVC_VERSION LESS_EQUAL 1952)
+     AND (test STREQUAL "force_disconnect")
+  )
+    target_compile_definitions(
+      ${test}_test PRIVATE HPX_HAVE_FORCE_NO_CXX_MODULES
+    )
+  endif()
 endforeach()

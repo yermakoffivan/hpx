@@ -190,7 +190,9 @@ namespace hpx::util {
                 HPX_PP_EXPAND(HPX_HAVE_THREAD_BACKTRACE_DEPTH)) "}",
             "handle_signals = ${HPX_HANDLE_SIGNALS:1}",
             "handle_failed_new = ${HPX_HANDLE_FAILED_NEW:1}",
-
+#if defined(HPX_HAVE_FAULT_TOLERANCE)
+            "enable_fault_tolerance = ${HPX_ENABLE_FAULT_TOLERANCE:0}",
+#endif
             // arity for collective operations implemented in a tree fashion
             "[hpx.lcos.collectives]",
             "arity = ${HPX_LCOS_COLLECTIVES_ARITY:32}",

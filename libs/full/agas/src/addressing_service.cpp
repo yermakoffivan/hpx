@@ -1080,8 +1080,15 @@ namespace hpx::agas {
         {
             HPX_THROW_EXCEPTION(hpx::error::bad_parameter,
                 "addressing_service::resolve_async", "invalid reference id");
+        }
+
+#if defined(HPX_HAVE_FORCE_DISCONNECT)
+        if (parcelset::locality_was_disconnected(
+                naming::get_locality_id_from_gid(gid)))
+        {
             return naming::address();
         }
+#endif
 
         // Try the cache.
         if (caching_)

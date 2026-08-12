@@ -103,9 +103,17 @@ namespace hpx::parcelset {
                 }
             }
 
+            // check if the destination locality is (still) known
+            auto const dest = p.destination();
+            if (locality_was_disconnected(
+                    naming::get_locality_id_from_gid(dest)))
+            {
+                return true;
+            }
+
             hpx::error_code ec1(hpx::throwmode::lightweight);
             endpoints_type const& dest_endpoints =
-                agas::resolve_locality(p.destination(), ec1);
+                agas::resolve_locality(dest, ec1);
             if (dest_endpoints.empty())
             {
                 return true;
@@ -404,6 +412,12 @@ namespace hpx::parcelset {
     void parcelhandler::remove_from_connection_cache(
         naming::gid_type const& gid, endpoints_type const& endpoints)
     {
+        {
+            std::lock_guard<mutex_type> l(mtx_);
+            disconnected_localities_.insert(
+                naming::get_locality_id_from_gid(gid));
+        }
+
         for (auto const& endpoint : endpoints | std::views::values)
         {
             for (auto const& pport : pports_ | std::views::values)
@@ -416,6 +430,12 @@ namespace hpx::parcelset {
         }
 
         agas::remove_resolved_locality(gid);
+    }
+
+    bool parcelhandler::locality_was_disconnected(std::uint32_t const id) const
+    {
+        std::lock_guard<mutex_type> l(mtx_);
+        return disconnected_localities_.contains(id);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -636,7 +656,22 @@ namespace hpx::parcelset {
                 "parcelhandler::put_parcel: handled: {}", p.parcel_id());
         };
 
-        put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler));
+        if (hpx::tolerate_node_faults())
+        {
+            parcelset::parcel const hold_p = p;
+            auto hold_handler = handler;
+            hpx::detail::try_catch_exception_ptr(
+                [&]() { put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler)); },
+                [&](std::exception_ptr const& ep) {
+                    error_code ec =
+                        make_error_code(get_error(ep), throwmode::rethrow);
+                    hold_handler(ec, hold_p);
+                });
+        }
+        else
+        {
+            put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler));
+        }
     }
 
     void parcelhandler::put_parcel(parcelset::parcel p, write_handler_type f)
@@ -668,7 +703,22 @@ namespace hpx::parcelset {
                 "parcelhandler::put_parcel: handled: {}", p.parcel_id());
         };
 
-        put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler));
+        if (hpx::tolerate_node_faults())
+        {
+            parcelset::parcel const hold_p = p;
+            auto hold_handler = handler;
+            hpx::detail::try_catch_exception_ptr(
+                [&]() { put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler)); },
+                [&](std::exception_ptr const& ep) {
+                    error_code ec =
+                        make_error_code(get_error(ep), throwmode::rethrow);
+                    hold_handler(ec, hold_p);
+                });
+        }
+        else
+        {
+            put_parcel_impl(HPX_MOVE(p), HPX_MOVE(handler));
+        }
     }
 
     void parcelhandler::put_parcel_impl(parcel&& p, write_handler_type&& f)
